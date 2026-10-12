@@ -99,7 +99,12 @@ input[type=password]{width:100%;box-sizing:border-box;background:var(--panel);co
     <p class="err" id="nickErr" aria-live="polite"></p>
     <button class="btn" type="submit" id="startBtn">시작하기</button>
   </form>
-  <div class="meta"><span>참여 현황</span><b id="joined">-</b></div>
+  <section class="board" aria-labelledby="homeBoardTitle">
+    <div class="boardHead"><h2 id="homeBoardTitle">참여 현황</h2><span id="joined">-</span></div>
+    <ol class="ranks" id="homeRanks"></ol>
+    <p class="lead" id="homeMsg"></p>
+    <button class="link" type="button" id="homeRefresh">새로고침</button>
+  </section>
   <button class="link" id="ansLink">정답 확인 (관리자)</button>
 </div>
 
@@ -122,6 +127,7 @@ input[type=password]{width:100%;box-sizing:border-box;background:var(--panel);co
     <p class="lead" id="boardMsg"></p>
   </section>
   <button class="btn ghost" id="refreshBtn">순서 새로고침</button>
+  <button class="link" id="resultBack">처음으로</button>
 </div>
 
 <div class="wrap" id="lock" hidden>
@@ -186,8 +192,12 @@ async function api(body){
   return res.json();
 }
 async function loadJoined(){
-  try { const d = await api(); $('joined').textContent = `${d.list.length} / ${MAX_PEOPLE}명`; return d }
-  catch(e){ $('joined').textContent = API ? '불러오지 못함' : '-'; return null }
+  let d = null;
+  try { d = await api() } catch(e){}
+  renderBoard(d, 'homeRanks', 'joined', 'homeMsg');
+  if (!d) $('homeMsg').textContent = API ? '참여 현황을 불러오지 못했어요. 잠시 후 새로고침해 주세요.' : '참여 현황 기록 주소가 아직 연결되지 않았어요.';
+  else if (!d.list.length) $('homeMsg').textContent = '아직 참여한 사람이 없어요. 첫 번째로 풀어 보세요!';
+  return d;
 }
 async function start(){
   const name = $('nick').value.trim();
@@ -259,8 +269,8 @@ function pick(i){
   setTimeout(() => { idx++; idx < round.length ? ask() : finish() }, i < 0 ? 900 : 450);
 }
 
-function renderBoard(d){
-  const ul = $('ranks'); ul.innerHTML = '';
+function renderBoard(d, listId = 'ranks', countId = 'boardCount', msgId = 'boardMsg'){
+  const ul = $(listId); ul.innerHTML = '';
   const list = d ? d.list : [];
   list.forEach(r => {
     const li = document.createElement('li'); if (r.name === nickname) li.className = 'me';
@@ -269,8 +279,8 @@ function renderBoard(d){
     const sc = document.createElement('span'); sc.className = 'sc'; sc.textContent = r.score + '점';
     li.append(no, nm, sc); ul.appendChild(li);
   });
-  $('boardCount').textContent = d ? `${list.length} / ${MAX_PEOPLE}명` : '';
-  $('boardMsg').textContent = !d ? '풀이 순서를 불러오지 못했어요. 잠시 후 새로고침해 주세요.' : list.length ? '' : '아직 기록이 없어요.';
+  $(countId).textContent = d ? `${list.length} / ${MAX_PEOPLE}명` : '-';
+  $(msgId).textContent = !d ? '풀이 순서를 불러오지 못했어요. 잠시 후 새로고침해 주세요.' : list.length ? '' : '아직 기록이 없어요.';
 }
 async function finish(){
   const pts = Math.round(score / round.length * 100);
@@ -313,6 +323,8 @@ function renderAnswers(list){
 $('nickForm').addEventListener('submit', e => { e.preventDefault(); start() });
 $('refreshBtn').onclick = async () => { $('refreshBtn').disabled = true; let d = null; try { d = await api() } catch(e) {} renderBoard(d); $('refreshBtn').disabled = false };
 loadJoined();
+$('homeRefresh').onclick = async () => { $('homeRefresh').disabled = true; await loadJoined(); $('homeRefresh').disabled = false };
+$('resultBack').onclick = () => { $('nick').value = ''; show('home'); loadJoined() };
 $('ansLink').onclick = () => { $('pw').value = ''; $('pwErr').textContent = ''; show('lock'); $('pw').focus() };
 $('lockBack').onclick = () => show('home');
 $('ansBack').onclick = () => { $('answerList').innerHTML = ''; show('home') };
